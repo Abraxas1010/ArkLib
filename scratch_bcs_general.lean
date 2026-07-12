@@ -265,3 +265,64 @@ theorem append_perfectCompleteness_of_challenge_free
     (fun stmt wit s =>
       hfact_of_challenge_free R₁.prover R₂.prover hCF₁ hCF₂ impl stmt wit s)
     h₁ h₂
+
+/-! ## Message-opening generality: the keystone with challenges allowed
+    everywhere except the right protocol's opening round. -/
+
+theorem hfact_of_message_opening
+    {n' : ℕ} {pSpec₂' : ProtocolSpec (n' + 1)}
+    [h₂' : ∀ i, SampleableType (pSpec₂'.Challenge i)]
+    (P₁ : Prover oSpec Stmt₁ Wit₁ Stmt₂ Wit₂ pSpec₁)
+    (P₂' : Prover oSpec Stmt₂ Wit₂ Stmt₃ Wit₃ pSpec₂')
+    (hop : pSpec₂'.dir ⟨0, by omega⟩ = .P_to_V)
+    (impl : QueryImpl oSpec (StateT σ ProbComp))
+    (stmt : Stmt₁) (wit : Wit₁) (s : σ) :
+    StateT.run (simulateQ (QueryImpl.addLift impl challengeQueryImpl :
+        QueryImpl _ (StateT σ ProbComp))
+      (liftM ((P₁.append P₂').run stmt wit) :
+        OracleComp (oSpec + [(pSpec₁ ++ₚ pSpec₂').Challenge]ₒ) _)) s
+    = (do
+      let (r₁, s₁) ← StateT.run (simulateQ (QueryImpl.addLift impl challengeQueryImpl :
+          QueryImpl _ (StateT σ ProbComp))
+        (liftM (P₁.run stmt wit) :
+          OracleComp (oSpec + [pSpec₁.Challenge]ₒ) _)) s
+      let (r₂, s₂) ← StateT.run (simulateQ (QueryImpl.addLift impl challengeQueryImpl :
+          QueryImpl _ (StateT σ ProbComp))
+        (liftM (P₂'.run r₁.2.1 r₁.2.2) :
+          OracleComp (oSpec + [pSpec₂'.Challenge]ₒ) _)) s₁
+      pure ((r₁.1 ++ₜ r₂.1, r₂.2), s₂)) := by
+  rw [show (liftM ((P₁.append P₂').run stmt wit) :
+      OracleComp (oSpec + [(pSpec₁ ++ₚ pSpec₂').Challenge]ₒ) _)
+    = (P₁.append P₂').run stmt wit from rfl]
+  rw [AppendGeneral.append_run_of_message_opening P₁ P₂' hop stmt wit]
+  rw [show (liftM (P₁.run stmt wit) : OracleComp (oSpec + [pSpec₁.Challenge]ₒ) _)
+    = P₁.run stmt wit from rfl]
+  simp only [simulateQ_bind, simulateQ_addLift_liftComp_left,
+    simulateQ_addLift_liftComp_right, simulateQ_pure, StateT.run_bind, StateT.run_pure]
+  rfl
+
+/-! ## THE T1 KEYSTONE: completeness composes for the challenge-free class,
+    at fully general arity — #635's composition theorem with the prover
+    factorization discharged by `append_run_of_challenge_free`. -/
+
+theorem append_perfectCompleteness_of_message_opening
+    {n' : ℕ} {pSpec₂' : ProtocolSpec (n' + 1)}
+    [h₂' : ∀ i, SampleableType (pSpec₂'.Challenge i)]
+    {init : ProbComp σ} {impl : QueryImpl oSpec (StateT σ ProbComp)}
+    {rel₁ : Set (Stmt₁ × Wit₁)} {rel₂ : Set (Stmt₂ × Wit₂)} {rel₃ : Set (Stmt₃ × Wit₃)}
+    (R₁ : Reduction oSpec Stmt₁ Wit₁ Stmt₂ Wit₂ pSpec₁)
+    (R₂ : Reduction oSpec Stmt₂ Wit₂ Stmt₃ Wit₃ pSpec₂')
+    (hop : pSpec₂'.dir ⟨0, by omega⟩ = .P_to_V)
+    (f₁ : Stmt₁ → FullTranscript pSpec₁ → Stmt₂)
+    (f₂ : Stmt₂ → FullTranscript pSpec₂' → Stmt₃)
+    (hf₁ : ∀ stmt td, R₁.verifier.verify stmt td =
+      (pure (f₁ stmt td) : OptionT (OracleComp oSpec) Stmt₂))
+    (hf₂ : ∀ stmt td, R₂.verifier.verify stmt td =
+      (pure (f₂ stmt td) : OptionT (OracleComp oSpec) Stmt₃))
+    (h₁ : R₁.perfectCompleteness init impl rel₁ rel₂)
+    (h₂ : ∀ init' : ProbComp σ, R₂.perfectCompleteness init' impl rel₂ rel₃) :
+    (R₁.append R₂).perfectCompleteness init impl rel₁ rel₃ :=
+  Reduction.append_perfectCompleteness_of_proverFactorization R₁ R₂ f₁ f₂ hf₁ hf₂
+    (fun stmt wit s =>
+      hfact_of_message_opening R₁.prover R₂.prover hop impl stmt wit s)
+    h₁ h₂
