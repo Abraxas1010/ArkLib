@@ -164,6 +164,7 @@ import ArkLib.OracleReduction.Cast
 import ArkLib.OracleReduction.Composition.Parallel.Basic
 import ArkLib.OracleReduction.Composition.Sequential.Append
 import ArkLib.OracleReduction.Composition.Sequential.AppendRun
+import ArkLib.OracleReduction.Composition.Sequential.AppendRunNecessity
 import ArkLib.OracleReduction.Composition.Sequential.General
 import ArkLib.OracleReduction.Equiv
 import ArkLib.OracleReduction.Execution
